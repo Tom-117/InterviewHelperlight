@@ -1,0 +1,52 @@
+John Doe
+Email: john.doe@example.com
+Phone: +1 (555) 123-4567
+LinkedIn: linkedin.com/in/johndoe
+Location: Budapest, Hungary
+
+Professional Summary:
+Highly motivated Software Engineer with 5+ years of experience in backend development, natural language processing, and AI-driven systems. Passionate about clean code, scalable architectures, and mentoring junior developers.
+
+Technical Skills:
+- Programming Languages: Python, JavaScript (Node.js), Java, SQL
+- Frameworks: Django, FastAPI, React, PyTorch, TensorFlow
+- Tools: Docker, Git, Linux, AWS, REST APIs
+- Databases: PostgreSQL, MongoDB
+- NLP Models: Transformers (BERT, RoBERTa, Mistral), Hugging Face, SentenceTransformers
+
+Work Experience:
+Software Engineer | AI Solutions Ltd. | 2021 – Present
+- Designed and implemented NLP-based question-answering systems using RoBERTa and SentenceTransformer models.
+- Optimized model inference by deploying quantized versions on AWS EC2 instances with GPU acceleration.
+- Mentored 3 junior engineers and led weekly code review sessions.
+
+Backend Developer | DataTech Systems | 2018 – 2021
+- Developed scalable REST APIs using Django and FastAPI.
+- Integrated PostgreSQL databases and implemented Redis caching for faster response times.
+- Collaborated with a cross-functional team using Agile methodologies.
+
+Key Projects & Achievements:
+- Developed an interview preparation chatbot using Mistral-7B for question generation and scoring.
+- Built a document parsing engine that extracts structured data from resumes using RoBERTa QA models.
+- Received “Employee of the Quarter” award for improving model efficiency by 35%.
+
+Soft Skills:
+- Strong communication and teamwork
+- Problem-solving and analytical thinking
+- Leadership and mentorship
+- Adaptability and continuous learning
+
+Education:
+MSc in Computer Science | Budapest University of Technology and Economics | 2018
+BSc in Software Engineering | Eötvös Loránd University | 2016
+
+Certifications:
+- AWS Certified Machine Learning – Specialty
+- Deep Learning Specialization (Coursera)
+- Scrum Fundamentals Certified
+
+Languages:
+English (Fluent), Hungarian (Native), German (Intermediate)
+
+Interests:
+AI Ethics, Open-Source Contributions, Hiking, and Music Production

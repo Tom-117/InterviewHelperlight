@@ -1,0 +1,4 @@
+# Ignore the models directory at the repository root
+/models/
+# (optional) ignore any nested models folders as well
+**/models/
