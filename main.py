@@ -20,7 +20,7 @@ def load_local_models():
             flan_tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
             flan_model = AutoModelForSeq2SeqLM.from_pretrained(
                 "google/flan-t5-base",
-                torch_dtype=torch_dtype,
+                dtype=torch_dtype,
                 device_map="auto"
             )
             flan_tokenizer.save_pretrained(flan_path)
@@ -29,7 +29,7 @@ def load_local_models():
             flan_tokenizer = AutoTokenizer.from_pretrained(flan_path)
             flan_model = AutoModelForSeq2SeqLM.from_pretrained(
                 flan_path,
-                torch_dtype=torch_dtype,
+                dtype=torch_dtype,
                 device_map="auto"
             )
 
@@ -40,7 +40,7 @@ def load_local_models():
             gpt_tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-hu")
             gpt_model = AutoModelForSeq2SeqLM.from_pretrained(
                 "Helsinki-NLP/opus-mt-en-hu",
-                torch_dtype=torch_dtype,
+                dtype=torch_dtype,
                 device_map="auto"
             )
             gpt_tokenizer.save_pretrained(translation_path)
@@ -49,7 +49,7 @@ def load_local_models():
             gpt_tokenizer = AutoTokenizer.from_pretrained(translation_path)
             gpt_model = AutoModelForSeq2SeqLM.from_pretrained(
                 translation_path,
-                torch_dtype=torch_dtype,
+                dtype=torch_dtype,
                 device_map="auto"
             )
 

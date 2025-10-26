@@ -1,22 +1,29 @@
-FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
+FROM python:3.10-slim
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHONUNBUFFERED=1 \
-    TRANSFORMERS_CACHE=/models_cache
-
+# Set working directory
 WORKDIR /app
 
-
-COPY requirements.txt .
-RUN apt-get update && apt-get install -y --no-install-recommends git \
-    && pip install --no-cache-dir -r requirements.txt \
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy application files
+COPY main.py .
+COPY cv.txt .
 
+# Create directory for models
+RUN mkdir -p models
 
-RUN mkdir -p /app/models
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV TRANSFORMERS_CACHE=/app/models
+ENV TORCH_HOME=/app/models
 
-
+# Run the application
 CMD ["python", "main.py"]

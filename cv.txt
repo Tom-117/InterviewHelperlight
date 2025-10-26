@@ -1,7 +1,5 @@
 John Doe
 Email: john.doe@example.com
-Phone: +1 (555) 123-4567
-LinkedIn: linkedin.com/in/johndoe
 Location: Budapest, Hungary
 
 Professional Summary:
