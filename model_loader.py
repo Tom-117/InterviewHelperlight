@@ -1,16 +1,14 @@
 import os
-import sys
-import torch
-import re
 import random
+import re
+import sys
 from collections import Counter
-from transformers import (
-    AutoTokenizer,
-    AutoModelForSeq2SeqLM,
-    AutoModelForTokenClassification,
-    pipeline,
-)
+
+import torch
 from sentence_transformers import SentenceTransformer, util
+from transformers import (AutoModelForSeq2SeqLM,
+                          AutoModelForTokenClassification, AutoTokenizer,
+                          pipeline)
 
 
 def load_hf_model(model_id, local_path, model_class, tokenizer_class, torch_dtype):

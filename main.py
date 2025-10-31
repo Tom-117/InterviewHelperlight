@@ -1,18 +1,16 @@
 import os
-import sys
-import torch
-import re
 import random
+import re
+import sys
 from collections import Counter
-from transformers import (
-    AutoTokenizer,
-    AutoModelForSeq2SeqLM,
-    AutoModelForTokenClassification,
-    pipeline,
-)
-from sentence_transformers import SentenceTransformer, util
-from model_loader import load_local_models, load_hf_model
 
+import torch
+from sentence_transformers import SentenceTransformer, util
+from transformers import (AutoModelForSeq2SeqLM,
+                          AutoModelForTokenClassification, AutoTokenizer,
+                          pipeline)
+
+from model_loader import load_hf_model, load_local_models
 
 COMMON_TECH_KEYWORDS = [
     "python",
