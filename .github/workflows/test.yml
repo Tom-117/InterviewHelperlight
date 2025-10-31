@@ -1,0 +1,50 @@
+name: Model Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: 
+
+jobs:
+  e2e-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Cache downloaded models
+        uses: actions/cache@v4
+        with:
+          
+          path: ./models
+          
+          key: ${{ runner.os }}-models-v1-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-models-v1-
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create simulated user input
+        run: |
+          
+          echo "Ez az én teszt válaszom egy technikai kérdésre." > answers.txt
+          echo "Ez a második válaszom a soft skillekre." >> answers.txt
+          echo "A harmadik válaszom a motivációra." >> answers.txt
+
+      - name: Run main script with simulated input
+        env:
+         
+          PYTHONUNBUFFERED: 1
+          TRANSFORMERS_CACHE: ./models
+          TORCH_HOME: ./models
+        run: |
+          
+          python main.py < answers.txt

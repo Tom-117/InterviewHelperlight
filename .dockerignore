@@ -3,36 +3,42 @@
 .gitignore
 
 
-__pycache__/
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
 *.py[cod]
 *$py.class
-*.so
-.Python
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-*.egg-info/
+.pytest_cache
+.coverage
+coverage.xml
+.ruff_cache
+*.egg-info
+dist
+build
 
-
-venv/
+# Development
+.env
+.venv
 env/
+venv/
 ENV/
-
-
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
 models/
-
-
+*.bin
+*.pt
+*.gguf
+*.safetensors
+data/
+datasets/
 .idea/
 .vscode/
 *.swp
 *.swo
-
 .DS_Store
-Thumbs.db
