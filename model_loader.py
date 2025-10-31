@@ -6,9 +6,12 @@ from collections import Counter
 
 import torch
 from sentence_transformers import SentenceTransformer, util
-from transformers import (AutoModelForSeq2SeqLM,
-                          AutoModelForTokenClassification, AutoTokenizer,
-                          pipeline)
+from transformers import (
+    AutoModelForSeq2SeqLM,
+    AutoModelForTokenClassification,
+    AutoTokenizer,
+    pipeline,
+)
 
 
 def load_hf_model(model_id, local_path, model_class, tokenizer_class, torch_dtype):

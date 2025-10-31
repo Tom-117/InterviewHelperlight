@@ -10,6 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade-strategy eager -r requirements.txt
 
 COPY main.py .
+COPY model_loader.py .
 COPY cv.txt .
 
 RUN mkdir -p models

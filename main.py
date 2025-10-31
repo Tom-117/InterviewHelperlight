@@ -6,9 +6,12 @@ from collections import Counter
 
 import torch
 from sentence_transformers import SentenceTransformer, util
-from transformers import (AutoModelForSeq2SeqLM,
-                          AutoModelForTokenClassification, AutoTokenizer,
-                          pipeline)
+from transformers import (
+    AutoModelForSeq2SeqLM,
+    AutoModelForTokenClassification,
+    AutoTokenizer,
+    pipeline,
+)
 
 from model_loader import load_hf_model, load_local_models
 
