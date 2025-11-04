@@ -7,10 +7,10 @@ from collections import Counter
 import torch
 from sentence_transformers import SentenceTransformer, util
 from transformers import (
+    AutoModelForCausalLM,
+    AutoModelForQuestionAnswering,
     AutoModelForSeq2SeqLM,
     AutoModelForTokenClassification,
-    AutoModelForQuestionAnswering,
-    AutoModelForCausalLM,
     AutoTokenizer,
     pipeline,
 )
@@ -44,11 +44,15 @@ def load_local_models():
         torch.cuda.empty_cache()
         if torch.cuda.is_available():
             print(f"GPU available: {torch.cuda.get_device_name(0)}")
-            print(f"Total GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1024**2:.1f} MB")
-            print(f"Available GPU memory: {torch.cuda.memory_allocated() / 1024**2:.1f} MB used")
+            print(
+                f"Total GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1024**2:.1f} MB"
+            )
+            print(
+                f"Available GPU memory: {torch.cuda.memory_allocated() / 1024**2:.1f} MB used"
+            )
         else:
             print("No GPU available, using CPU")
-            
+
         # Determine dtype based on hardware
         torch_dtype = (
             torch.float16
@@ -101,7 +105,7 @@ def load_local_models():
             "question-answering",
             model=kw_model,
             tokenizer=kw_tokenizer,
-            handle_long_generation=True
+            handle_long_generation=True,
         )
 
         print("All models loaded successfully!\n")
