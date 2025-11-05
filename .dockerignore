@@ -2,7 +2,7 @@
 .git
 .gitignore
 .github/workflows/*.yml
-
+uploads/
 # Python
 __pycache__
 *.pyc

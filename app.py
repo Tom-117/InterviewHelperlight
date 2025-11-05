@@ -231,4 +231,192 @@ def extract_technical_terms(text, qa_model, embedder, top_n=5):
         ]
         return matches[:top_n]
 
+app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
+app.config["UPLOAD_FOLDER"] = "./uploads"
+UPLOAD_FOLDER = os.path.join(os.getcwd(), "uploads")
+ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
+
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+
+print("Loading models... (this may take a minute)")
+flan_tokenizer, flan_model, embedder, keyword_extractor = load_local_models()
+print("Models loaded successfully!")
+
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        if "cv_file" not in request.files:
+            return render_template("index.html", error="No file uploaded.")
+
+        file = request.files["cv_file"]
+        if file.filename == "":
+            return render_template("index.html", error="No file selected.")
+
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        file.save(filepath)
+
+        try:
+            cv_text = read_cv_file(filepath)
+            if not cv_text.strip():
+                return render_template(
+                    "index.html", error="Could not extract text from the uploaded file."
+                )
+
+            techs = extract_technical_terms(
+                cv_text, keyword_extractor, embedder, top_n=5
+            )
+
+            if not techs:
+                return render_template(
+                    "index.html",
+                    error="Could not identify technical skills in the CV. Please ensure your CV includes technical terms.",
+                )
+
+            tech_summary = ", ".join(techs)
+        except Exception as e:
+            return render_template("index.html", error=f"Failed to process CV: {e}")
+
+        return render_template(
+            "interview.html", cv_text=cv_text, tech_summary=tech_summary
+        )
+    return render_template("index.html")
+
+
+@app.route("/generate", methods=["POST"])
+def generate_questions():
+    cv_text = request.form["cv_text"]
+    tech_summary = request.form["tech_summary"]
+    question_type = request.form.get(
+        "question_type", "technical"
+    )  # Default to technical if not specified
+
+    persona = "You are a sharp, experienced technical interviewer conducting an important job interview."
+
+    role = persona + "\n"
+
+    if question_type == "technical":
+        role += f"""Focus area: {tech_summary}
+Your task: Generate a specific technical question that:
+1. Relates to the candidate's actual experience from their CV
+2. Probes their deep understanding of {tech_summary}
+3. Asks about a real technical challenge they faced"""
+    elif question_type == "soft_skills":
+        role += """Focus area: Professional Behavior and Team Dynamics
+Your task: Generate a behavioral question that:
+1. Explores how they handle workplace challenges
+2. Reveals their approach to teamwork and communication
+3. Provides insight into their problem-solving style"""
+    else:  # motivation
+        role += f"""Focus area: Career Goals and Motivation
+Your task: Generate a question that:
+1. Explores their career trajectory and aspirations
+2. Reveals their motivation for working with {tech_summary}
+3. Uncovers what drives them professionally"""
+
+    base_context = f"""Analyze this CV excerpt carefully:
+{cv_text[:2000]}
+
+Key technical skills: {tech_summary}
+"""
+
+    if question_type == "technical":
+        prompt = f"""{base_context}
+
+You are an expert technical interviewer. Generate a challenging but fair technical interview question that:
+1. Focuses specifically on their experience with {tech_summary}
+2. Tests both theoretical understanding and practical application
+3. Encourages them to describe a specific technical challenge they solved
+4. Reveals their problem-solving approach and technical depth
+
+The question should:
+- Be specific to their actual experience, not generic
+- Focus on complex problem-solving, not just tool usage
+- Encourage detailed technical discussion
+- Be answerable with a concrete example from their work
+
+Format: Generate only the question, starting with "Can you describe" or "Tell me about"
+Question:"""
+
+    elif question_type == "soft_skills":
+        prompt = f"""{base_context}
+
+You are an experienced behavioral interviewer. Generate a situational interview question that:
+1. Explores how they've applied {tech_summary} in team settings
+2. Reveals their approach to technical collaboration
+3. Uncovers their communication style with both technical and non-technical stakeholders
+4. Shows how they handle challenges and conflicts
+
+The question should:
+- Focus on real scenarios from their experience
+- Encourage STAR method responses
+- Reveal both technical and interpersonal skills
+- Target specific behavioral competencies
+
+Format: Generate only the question, starting with "Tell me about" or "Describe a time"
+Question:"""
+
+    else:  # motivation
+        prompt = f"""{base_context}
+
+You are an insightful career development interviewer. Generate a motivation-focused question that:
+1. Explores their journey with {tech_summary}
+2. Reveals their technical growth mindset
+3. Uncovers their long-term career vision
+4. Shows what drives their technical choices
+
+The question should:
+- Connect their past experiences to future goals
+- Reveal their passion for technology
+- Explore their technical decision-making
+- Uncover their professional values
+
+Format: Generate only the question, starting with "What motivated" or "How has"
+Question:"""
+
+    inputs = flan_tokenizer(
+        prompt, return_tensors="pt", truncation=True, max_length=1024
+    ).to(flan_model.device)
+    outputs = flan_model.generate(
+        **inputs,
+        max_new_tokens=100,
+        do_sample=True,
+        temperature=0.7,
+        top_p=0.9,
+        num_return_sequences=1,
+    )
+    question = flan_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+
+    # Clean up the generated question
+    question = re.sub(r"[\[\]\{\}]", "", question)
+    
+    if "Question:" in question:
+        question = question.split("Question:")[-1].strip()
+
+    question = re.sub(
+        r"^(Here'?s? (?:a |an )?(?:possible |suggested |example )?question:?\s*)",
+        "",
+        question,
+        flags=re.IGNORECASE,
+    )
+
+    if not question:
+        question = "Could you tell me about your experience?"
+    else:
+        question = (
+            question.rstrip(".") + "?" if not question.endswith("?") else question
+        )
+        question = question[0].upper() + question[1:]
+
+    return render_template(
+        "interview.html",
+        cv_text=cv_text,
+        tech_summary=tech_summary,
+        questions=[question],
+    )
 
