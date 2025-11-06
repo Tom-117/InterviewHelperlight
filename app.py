@@ -420,3 +420,136 @@ Question:"""
         questions=[question],
     )
 
+@app.route("/evaluate", methods=["POST"])
+def evaluate_answer():
+    question = request.form["question"]
+    user_answer = request.form["user_answer"]
+    tech_summary = request.form["tech_summary"]
+
+    if len(user_answer.strip()) < 10:
+        return render_template(
+            "interview.html",
+            question=question,
+            user_answer=user_answer,
+            feedback="Please provide a more detailed answer to receive meaningful feedback.",
+            quality_score=0,
+            tech_summary=tech_summary,
+        )
+
+    ideal_prompt = f"""Question: {question}
+
+Create a model STAR method answer that:
+1. Describes a specific Situation
+2. Explains the Task clearly
+3. Details the Actions taken
+4. Shows measurable Results
+5. Demonstrates expertise in {tech_summary}
+
+Answer in 2-3 paragraphs."""
+
+    inputs = flan_tokenizer(
+        ideal_prompt, return_tensors="pt", truncation=True, max_length=1024
+    ).to(flan_model.device)
+    outputs = flan_model.generate(
+        **inputs, max_new_tokens=200, num_beams=2, temperature=0.3
+    )
+    ideal_answer = flan_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+
+    try:
+        embeddings = embedder.encode(
+            [user_answer, ideal_answer], convert_to_tensor=True
+        )
+        similarity_score = float(util.cos_sim(embeddings[0], embeddings[1]).item())
+    except Exception:
+        similarity_score = 0.0
+
+    star_prompt = f"""Rate this answer on STAR method implementation (0-10):
+Question: {question}
+Answer: {user_answer}
+Rate only the presence and quality of: Situation, Task, Action, Results
+Score:"""
+
+    tech_prompt = f"""Rate this answer on technical depth (0-10):
+Expected expertise in: {tech_summary}
+Answer: {user_answer}
+Rate only technical accuracy and depth.
+Score:"""
+
+    # Get STAR and Technical scores
+    star_score = generate_score(flan_model, flan_tokenizer, star_prompt)
+    tech_score = generate_score(flan_model, flan_tokenizer, tech_prompt)
+
+    # Calculate final scores
+    star_score = min(10, max(0, star_score))
+    tech_score = min(10, max(0, tech_score))
+    quality_score = (star_score + tech_score + similarity_score * 10) / 30.0
+
+    # Generate focused feedback based on scores
+    feedback_sections = []
+
+    # STAR Method Feedback
+    feedback_sections.append(f"STAR Method: {star_score}/10")
+    if star_score < 5:
+        feedback_sections.append(
+            "-Missing key STAR components - structure your answer with Situation, Task, Action, and Results"
+        )
+    elif star_score < 8:
+        feedback_sections.append(
+            "-Good attempt at STAR format but needs more specific details"
+        )
+    else:
+        feedback_sections.append("-Excellent use of STAR method")
+
+    # Technical Feedback
+    feedback_sections.append(f"\nTechnical Skills: {tech_score}/10")
+    if tech_score < 5:
+        feedback_sections.append(
+            f"-Include more specific examples of using {tech_summary}"
+        )
+    elif tech_score < 8:
+        feedback_sections.append("-Good technical content, consider adding more depth")
+    else:
+        feedback_sections.append("-Strong technical demonstration")
+
+    # Overall Quality
+    similarity_percent = int(similarity_score * 100)
+    feedback_sections.append(f"\nResponse Completeness: {similarity_percent}%")
+    if similarity_percent < 50:
+        feedback_sections.append("-Answer needs more detail and examples")
+    elif similarity_percent < 80:
+        feedback_sections.append("-Good response, could use more specific outcomes")
+    else:
+        feedback_sections.append("-Very comprehensive answer")
+
+    # Specific Improvements
+    feedback_sections.append("\nSuggested Improvements:")
+    missing_elements = []
+    if "situation" not in user_answer.lower():
+        missing_elements.append(
+            "-Set the context by describing the specific situation"
+        )
+    if "result" not in user_answer.lower() and "outcome" not in user_answer.lower():
+        missing_elements.append("-Include quantifiable results or outcomes")
+    if not any(
+        tech.lower() in user_answer.lower() for tech in tech_summary.split(", ")
+    ):
+        missing_elements.append(f"-Mention specific examples of using {tech_summary}")
+    if not missing_elements:
+        missing_elements.append(
+            "-Add more quantifiable metrics to strengthen your response"
+        )
+    feedback_sections.extend(missing_elements)
+
+    feedback = "\n".join(feedback_sections)
+
+    return render_template(
+        "interview.html",
+        question=question,
+        user_answer=user_answer,
+        feedback=feedback,
+        quality_score=round(quality_score, 2),
+        tech_summary=tech_summary,
+    )
+
+
+

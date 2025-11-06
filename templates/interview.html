@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Interview Practice</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen pb-12">
+    <div class="max-w-5xl mx-auto px-4 py-8">
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-6">Interview Practice</h1>
+            
+            <!-- Keywords Section -->
+            <div class="bg-blue-50 rounded-lg p-4 mb-8">
+                <h3 class="text-lg font-semibold text-blue-900 mb-2">Detected Skills:</h3>
+                <p class="text-blue-700">{{ tech_summary }}</p>
+            </div>
+
+            <!-- Question Generation Form -->
+            <form action="{{ url_for('generate_questions') }}" method="POST" class="mb-8">
+                <input type="hidden" name="cv_text" value="{{ cv_text }}">
+                <input type="hidden" name="tech_summary" value="{{ tech_summary }}">
+                <div class="space-y-4 mb-6">
+                    <div class="flex flex-wrap gap-4">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="question_type" value="technical" checked
+                                   class="form-radio text-blue-600">
+                            <span class="ml-2 text-gray-700">Technical Question</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="question_type" value="soft_skills"
+                                   class="form-radio text-blue-600">
+                            <span class="ml-2 text-gray-700">Behavioral Question</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="question_type" value="motivation"
+                                   class="form-radio text-blue-600">
+                            <span class="ml-2 text-gray-700">Motivation Question</span>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="bg-blue-600 text-white py-2 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                    Generate Question
+                </button>
+            </form>
+
+            <!-- Current Question -->
+            {% if questions %}
+                <div class="bg-gray-50 rounded-lg p-6 mb-8 border border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Current Question:</h3>
+                    <p class="text-gray-700 text-lg">{{ questions[0] }}</p>
+                </div>
+            {% endif %}
+
+            <!-- Response Form -->
+            <div class="bg-white rounded-lg">
+                <h3 class="text-xl font-semibold text-gray-900 mb-4">Your Response</h3>
+                <form action="{{ url_for('evaluate_answer') }}" method="POST" class="space-y-4">
+                    <input type="hidden" name="question" value="{{ questions[0] if questions else '' }}">
+                    <input type="hidden" name="tech_summary" value="{{ tech_summary }}">
+                    <div>
+                        <textarea name="user_answer" rows="6" 
+                                class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="Type your interview answer here..."></textarea>
+                    </div>
+                    <button type="submit" class="bg-green-600 text-white py-2 px-6 rounded-lg font-medium hover:bg-green-700 transition-colors">
+                        Get Feedback
+                    </button>
+                </form>
+            </div>
+
+            <!-- Feedback Section -->
+            {% if feedback %}
+                <div class="mt-8 bg-white rounded-lg border border-gray-200 overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                        <h4 class="text-lg font-semibold text-gray-900">Response Evaluation</h4>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        {% for line in feedback.split('\n') %}
+                            {% if line.strip().endswith('/10') %}
+                                <div class="flex items-center justify-between bg-blue-50 p-3 rounded">
+                                    <span class="font-medium text-blue-900">{{ line }}</span>
+                                </div>
+                            {% elif line.strip().startswith('•') %}
+                                <div class="pl-4 text-gray-700">{{ line }}</div>
+                            {% elif line.strip().endswith(':') %}
+                                <h5 class="font-semibold text-gray-900 mt-4">{{ line }}</h5>
+                            {% else %}
+                                <p class="text-gray-700">{{ line }}</p>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        <div class="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-lg font-semibold text-green-800">Overall Score</span>
+                                <span class="text-2xl font-bold text-green-800">
+                                    {{ "%.0f"|format(quality_score * 100) }}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
