@@ -231,6 +231,7 @@ def extract_technical_terms(text, qa_model, embedder, top_n=5):
         ]
         return matches[:top_n]
 
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 app.config["UPLOAD_FOLDER"] = "./uploads"
@@ -394,7 +395,7 @@ Question:"""
 
     # Clean up the generated question
     question = re.sub(r"[\[\]\{\}]", "", question)
-    
+
     if "Question:" in question:
         question = question.split("Question:")[-1].strip()
 
@@ -419,6 +420,7 @@ Question:"""
         tech_summary=tech_summary,
         questions=[question],
     )
+
 
 @app.route("/evaluate", methods=["POST"])
 def evaluate_answer():
@@ -525,9 +527,7 @@ Score:"""
     feedback_sections.append("\nSuggested Improvements:")
     missing_elements = []
     if "situation" not in user_answer.lower():
-        missing_elements.append(
-            "-Set the context by describing the specific situation"
-        )
+        missing_elements.append("-Set the context by describing the specific situation")
     if "result" not in user_answer.lower() and "outcome" not in user_answer.lower():
         missing_elements.append("-Include quantifiable results or outcomes")
     if not any(
@@ -552,4 +552,104 @@ Score:"""
     )
 
 
+def generate_score(model, tokenizer, prompt):
 
+    try:
+        inputs = tokenizer(
+            prompt, return_tensors="pt", truncation=True, max_length=512
+        ).to(model.device)
+        outputs = model.generate(**inputs, max_new_tokens=10, temperature=0.3)
+        result = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+        # Extract the first number found in the response
+        score_match = re.search(r"\d+", result)
+        if score_match:
+            return min(10, max(0, int(score_match.group())))
+        return 5  # Default score if no number found
+    except Exception:
+        return 5  # Default score if generation fails
+
+    inputs = flan_tokenizer(
+        evaluation_prompt, return_tensors="pt", truncation=True, max_length=1024
+    ).to(flan_model.device)
+    outputs = flan_model.generate(
+        **inputs,
+        max_new_tokens=500,
+        num_beams=4,
+        temperature=0.4,
+        top_p=0.9,
+        repetition_penalty=1.2,
+        min_length=100,
+        no_repeat_ngram_size=3,
+    )
+    feedback = flan_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+
+    structured_feedback = []
+
+    # Extract and validate scores
+    scores = re.findall(r"(\d+)(?:/|\s*out\s*of\s*)10", feedback)
+    if len(scores) >= 3:
+        star_score = min(10, max(0, int(scores[0])))
+        technical_score = min(10, max(0, int(scores[1])))
+        delivery_score = min(10, max(0, int(scores[2])))
+
+        structured_feedback.append(f"STAR Method: {star_score}/10")
+        structured_feedback.append(f"Technical Skills: {technical_score}/10")
+        structured_feedback.append(f"Delivery: {delivery_score}/10")
+
+        quality_score = (star_score + technical_score + delivery_score) / 30.0
+    else:
+
+        quality_score = 0.5  # 50%
+        structured_feedback.append("Scoring incomplete - please try again")
+
+    strengths = re.findall(
+        r"Strengths?:?(.*?)(?:Areas? to Improve|$)", feedback, re.DOTALL | re.IGNORECASE
+    )
+    improvements = re.findall(
+        r"(?:Areas? to Improve|Improvements?):?(.*?)(?:\n\n|$)",
+        feedback,
+        re.DOTALL | re.IGNORECASE,
+    )
+
+    if strengths:
+        points = re.findall(r"[-•*]\s*(.*?)(?=[-•*]|$)", strengths[0], re.DOTALL)
+        if points:
+            structured_feedback.append("\nStrengths:")
+            structured_feedback.extend(
+                f"- {point.strip()}" for point in points if len(point.strip()) > 10
+            )
+
+    if improvements:
+        points = re.findall(r"[-•*]\s*(.*?)(?=[-•*]|$)", improvements[0], re.DOTALL)
+        if points:
+            structured_feedback.append("\nAreas to Improve:")
+            structured_feedback.extend(
+                f"- {point.strip()}" for point in points if len(point.strip()) > 10
+            )
+
+    if len(structured_feedback) < 4:
+        structured_feedback = [
+            "STAR Method: Review the Situation-Task-Action-Result format",
+            "Technical Skills: Include more specific examples",
+            "Delivery: Add more detail to your response",
+            "\nSuggestion: Provide a more detailed answer that includes:",
+            "- The specific situation you encountered",
+            "- What actions you took",
+            "- The measurable results you achieved",
+        ]
+        quality_score = 0.3
+
+    feedback = "\n".join(structured_feedback)
+
+    return render_template(
+        "interview.html",
+        question=question,
+        user_answer=user_answer,
+        feedback=feedback,
+        quality_score=round(quality_score, 2),
+        tech_summary=tech_summary,
+    )
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)

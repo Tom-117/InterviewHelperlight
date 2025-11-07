@@ -1,7 +1,7 @@
 
 .git
 .gitignore
-.github/workflows/*.yml
+.github/
 uploads/
 # Python
 __pycache__

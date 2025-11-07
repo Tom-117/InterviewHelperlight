@@ -1,56 +1,132 @@
-name: Model Test
+name: Flask App and Model Tests
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - master
+      - 'features/**'
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 jobs:
-  e2e-run:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      
-      - name: Cache downloaded models
+      - name: Cache models
         uses: actions/cache@v4
         with:
-          path: ./models
-          key: ${{ runner.os }}-models-v1-${{ hashFiles('requirements.txt') }}
+          path: |
+            ./models/all-MiniLM-L6-v2
+            ./models/flan-t5-large
+            ./models/roberta-qa
+            ./models/valurank-MiniLM-L6-Keyword-Extraction
+          key: ${{ runner.os }}-models-v1-${{ hashFiles('model_loader.py', 'requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-models-v1-
 
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
-
-      
-      - name: Create simulated user input
+      - name: Install dependencies
         run: |
-          cat > answers.txt <<'EOF'
-          I love building scalable distributed systems with Python and Go.
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-flask pytest-cov
 
-          Once we hit 1 M QPS on a single MySQL instance; we solved it with sharding and read-replicas.
+      - name: Create test directories
+        run: |
+          mkdir -p uploads
+          mkdir -p models
 
-          I ask clarifying questions when feedback is vague, then create an action plan.
-
-          
-          
-          
-          EOF
-        
-      - name: Run main script with simulated input
+      - name: Test model loading
         env:
-          PYTHONUNBUFFERED: 1          
-          TRANSFORMERS_CACHE: ./models            
+          PYTHONUNBUFFERED: 1
+          TRANSFORMERS_CACHE: ./models
           TORCH_HOME: ./models
         run: |
-         
-          python main.py < answers.txt
+          python -c "
+          from model_loader import load_local_models
+          print('Testing model loading...')
+          try:
+              flan_tokenizer, flan_model, embedder, keyword_extractor = load_local_models()
+              print('Models loaded successfully!')
+          except Exception as e:
+              print(f'rror loading models: {e}')
+              exit(1)
+          "
+
+      - name: Create test CV
+        run: |
+          cat > uploads/test_cv.txt <<'EOF'
+          Senior Software Engineer
+
+          Technical Skills:
+          - Python, Flask, FastAPI
+          - Machine Learning, PyTorch, Transformers
+          - Docker, Kubernetes
+          - AWS, GCP
+          - MongoDB, PostgreSQL
+
+          Experience:
+          - Developed AI-powered interview assistance platform
+          - Implemented scalable microservices architecture
+          - Led team of 5 engineers in ML projects
+          EOF
+
+      - name: Run Flask tests
+        env:
+          FLASK_ENV: testing
+          PYTHONPATH: ${{ github.workspace }}
+          TRANSFORMERS_CACHE: ./models
+          TORCH_HOME: ./models
+        run: |
+          python -c "
+          import sys
+          from app import app
+          
+          try:
+              with app.test_client() as client:
+                  # Test home page
+                  response = client.get('/')
+                  assert response.status_code == 200
+                  print('Home page test passed')
+                  
+                  # Test CV upload
+                  with open('uploads/test_cv.txt', 'rb') as cv:
+                      response = client.post('/', data={
+                          'cv_file': (cv, 'test_cv.txt')
+                      })
+                      assert response.status_code == 200
+                      print('CV upload test passed')
+                      assert b'tech_summary' in response.data
+                      print('Technical skills extraction test passed')
+                  
+                  # Test question generation
+                  response = client.post('/generate', data={
+                      'cv_text': open('uploads/test_cv.txt').read(),
+                      'tech_summary': 'Python, Flask, ML',
+                      'question_type': 'technical'
+                  })
+                  assert response.status_code == 200
+                  print('Question generation test passed')
+                  
+                  print('\nAll Flask app tests passed!')
+                  sys.exit(0)
+          except AssertionError as e:
+              print(f'\nTest failed: {str(e)}')
+              sys.exit(1)
+          except Exception as e:
+              print(f'\nError during tests: {str(e)}')
+              sys.exit(1)
+          "

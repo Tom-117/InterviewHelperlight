@@ -196,10 +196,14 @@ def main():
                     for page in reader.pages:
                         page_text = page.extract_text() or ""
                         # Clean up common PDF extraction issues
-                        page_text = re.sub(r"\s+", " ", page_text)  # normalize whitespace
-                        page_text = re.sub(r"[^\x20-\x7E\n]", "", page_text)  # remove non-printable chars
+                        page_text = re.sub(
+                            r"\s+", " ", page_text
+                        )  # normalize whitespace
+                        page_text = re.sub(
+                            r"[^\x20-\x7E\n]", "", page_text
+                        )  # remove non-printable chars
                         text.append(page_text.strip())
-                    
+
                     cv_text = "\n".join(text).strip()
                     if not cv_text:
                         raise ValueError("No text could be extracted from the PDF")
