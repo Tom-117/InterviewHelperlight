@@ -3,10 +3,11 @@ name: Build and Push Docker Image to Docker Hub
 on:
   push:
     branches:
-      - main
-  workflow_dispatch: 
+      - features/webui
+  workflow_dispatch:
 
 jobs:
+  
   build-and-push:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
@@ -44,5 +45,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/interview-helper-lite:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/interview-helper-lite:webui
             ${{ secrets.DOCKERHUB_USERNAME }}/interview-helper-lite:${{ steps.vars.outputs.sha_short }}

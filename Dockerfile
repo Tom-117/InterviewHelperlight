@@ -1,20 +1,37 @@
-FROM pytorch/pytorch:2.7.1-cuda11.8-cudnn9-runtime
-
+FROM pytorch/pytorch:2.3.1-cuda11.8-cudnn8-runtime
 
 WORKDIR /app
 
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        bash \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
+
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir --upgrade-strategy eager -r requirements.txt
 
-COPY main.py .
-COPY model_loader.py .
-COPY cv.txt .
+COPY . .
 
-RUN mkdir -p models
-ENV TRANSFORMERS_CACHE=/app/models
-ENV TORCH_HOME=/app/models
 
-CMD ["python", "main.py"]
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+
+ENV PYTHONUNBUFFERED=1 \
+    HF_HOME=/app/models \
+    TORCH_HOME=/app/models \
+    MODEL_CACHE_DIR=/app/models
+
+
+EXPOSE 5000
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["web"]

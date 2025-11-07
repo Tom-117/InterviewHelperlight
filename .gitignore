@@ -1,12 +1,12 @@
-# Ignore the models directory at the repository root
-/models/
 
-**/models/
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# Distribution / packaging
 build/
 develop-eggs/
 dist/
@@ -24,18 +24,28 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-.cache
 
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
 *.cover
 *.py,cover
 .pytest_cache/
+.hypothesis/
+cover/
 
-
-# Flask stuff:
+# Flask stuff
 instance/
 .webassets-cache
+*.log
 
-
+# Environments
 .env
 .venv
 env/
@@ -44,4 +54,24 @@ ENV/
 env.bak/
 venv.bak/
 
+# ML Model files
+/models/*
+**/models/
 
+# User uploads
+/uploads/*
+**/uploads/
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+*.env.local

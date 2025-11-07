@@ -4,6 +4,7 @@ import re
 import sys
 from collections import Counter
 
+import PyPDF2
 import torch
 from sentence_transformers import SentenceTransformer, util
 from transformers import (
@@ -63,28 +64,70 @@ COMMON_TECH_KEYWORDS = [
 ]
 
 
-def extract_technical_terms(text, keyword_extractor, top_n=5):
+def extract_technical_terms(text, qa_model, top_n=5):
+    def clean_text(text):
+        text = text.strip()
+        text = re.sub(r"\s+", " ", text)
+        return text
 
     try:
-        ner_results = keyword_extractor(text)
-        raw_keywords = [
-            entity["word"].lower().strip()
-            for entity in ner_results
-            if entity["score"] > 0.3
+        questions = [
+            "List all programming languages mentioned in the text.",
+            "What specific technical skills or technologies are mentioned in the text?",
+            "What software applications or development tools are listed in the text?",
+            "What frameworks, libraries, or packages are mentioned in the text?",
+            "What databases, storage systems, or data technologies are discussed in the text?",
         ]
 
-        found_tech = []
-        for kw in raw_keywords:
-            for tech in COMMON_TECH_KEYWORDS:
-                if tech in kw or kw in tech:
-                    found_tech.append(tech)
-                    break
+        chunk_size = 512
+        chunks = [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
 
-        unique_tech = list(dict.fromkeys(found_tech))
-        return unique_tech[:top_n]
+        all_skills = set()
+
+        for chunk in chunks:
+            clean_chunk = clean_text(chunk)
+
+            for question in questions:
+                try:
+                    result = qa_model(
+                        question=question,
+                        context=clean_chunk,
+                        handle_impossible_answer=True,
+                        max_answer_len=100,
+                    )
+
+                    if result and result.get("answer") and result.get("score", 0) > 0.1:
+                        extracted_terms = re.split(
+                            r"[,;\n]|\band\b|\bor\b|\bas well as\b|\bsuch as\b|\bincluding\b",
+                            result["answer"].lower(),
+                        )
+
+                        for term in extracted_terms:
+                            term = term.strip("., ()[]{}")
+                            if term and len(term) > 2:
+                                term = re.sub(
+                                    r"\b(the|a|an|in|on|at|with|using|for|to|of)\b",
+                                    "",
+                                    term,
+                                )
+                                term = re.sub(r"\s+", " ", term).strip()
+                                if term and len(term) > 2:
+                                    all_skills.add(term)
+
+                except Exception as e:
+                    print(f"Extraction failed for chunk with question {question}: {e}")
+                    continue
+
+        text_lower = text.lower()
+        for tech in COMMON_TECH_KEYWORDS:
+            if re.search(rf"\b{re.escape(tech)}\b", text_lower):
+                all_skills.add(tech.lower())
+
+        unique_skills = list(dict.fromkeys(all_skills))
+        return unique_skills[:top_n]
 
     except Exception as e:
-        print(f"NER extraction failed (falling back to regex): {e}")
+        print(f"Skill extraction failed (falling back to regex): {e}")
         text_lower = text.lower()
         found = [
             kw
@@ -102,14 +145,121 @@ def main():
         print(f"FATAL ERROR: Expected 4 models, got mismatch: {e}")
         sys.exit(1)
 
+    # Create uploads directory if it doesn't exist
+    uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+    os.makedirs(uploads_dir, exist_ok=True)
+
+    # Check for CV file in uploads directory
+    cv_files = [
+        f for f in os.listdir(uploads_dir) if f.endswith((".txt", ".pdf", ".docx"))
+    ]
+
+    if not cv_files:
+        print("ERROR: No CV files found in /uploads directory.")
+        print("Please place your CV file (PDF, DOCX, or TXT) in the 'uploads' folder.")
+        return
+
+    if len(cv_files) > 1:
+        print("\nMultiple CV files found in uploads directory:")
+        for idx, file in enumerate(cv_files, 1):
+            print(f"  {idx}. {file}")
+
+        while True:
+            try:
+                choice = input("\nEnter the number of the CV to use (or 'q' to quit): ")
+                if choice.lower() == "q":
+                    return
+
+                file_idx = int(choice) - 1
+                if 0 <= file_idx < len(cv_files):
+                    cv_file = cv_files[file_idx]
+                    break
+                else:
+                    print("Invalid selection. Please try again.")
+            except ValueError:
+                print("Please enter a valid number.")
+    else:
+        cv_file = cv_files[0]
+
+    # Get the full path to the CV file
+    cv_file = os.path.join(uploads_dir, cv_file)
+    print(f"\nUsing CV: {os.path.basename(cv_file)}")
+    ext = os.path.splitext(cv_file)[1].lower()
+    print("\nReading CV file...")
+
     try:
-        with open("cv.txt", "r", encoding="utf-8") as f:
-            cv_text = f.read().strip()
-            if not cv_text:
-                print("ERROR: cv.txt is empty.")
+        if ext == ".pdf":
+            try:
+                with open(cv_file, "rb") as file:
+                    reader = PyPDF2.PdfReader(file)
+                    text = []
+                    for page in reader.pages:
+                        page_text = page.extract_text() or ""
+                        # Clean up common PDF extraction issues
+                        page_text = re.sub(
+                            r"\s+", " ", page_text
+                        )  # normalize whitespace
+                        page_text = re.sub(
+                            r"[^\x20-\x7E\n]", "", page_text
+                        )  # remove non-printable chars
+                        text.append(page_text.strip())
+
+                    cv_text = "\n".join(text).strip()
+                    if not cv_text:
+                        raise ValueError("No text could be extracted from the PDF")
+                print("Successfully read PDF file")
+            except ImportError:
+                print("ERROR: PyPDF2 not installed. Run: pip install PyPDF2")
                 return
-    except FileNotFoundError:
-        print("ERROR: cv.txt not found. Create it with your CV text.")
+
+        elif ext == ".docx":
+            try:
+                from docx import Document
+
+                doc = Document(cv_file)
+                # Extract both paragraphs and tables
+                text_parts = []
+
+                # Get text from paragraphs
+                for paragraph in doc.paragraphs:
+                    if paragraph.text.strip():
+                        text_parts.append(paragraph.text.strip())
+
+                # Get text from tables
+                for table in doc.tables:
+                    for row in table.rows:
+                        row_text = " ".join(
+                            cell.text.strip() for cell in row.cells if cell.text.strip()
+                        )
+                        if row_text:
+                            text_parts.append(row_text)
+
+                cv_text = "\n".join(text_parts)
+                if not cv_text.strip():
+                    raise ValueError("No text could be extracted from the DOCX file")
+                print("✓ Successfully read DOCX file")
+            except ImportError:
+                print("ERROR: python-docx not installed. Run: pip install python-docx")
+                return
+
+        elif ext == ".txt":
+            with open(cv_file, "r", encoding="utf-8") as file:
+                cv_text = file.read()
+                if not cv_text.strip():
+                    raise ValueError("The text file is empty")
+            print("Successfully read TXT file")
+        else:
+            print(f"ERROR: Unsupported file format: {ext}")
+            print("Please provide a PDF, DOCX, or TXT file.")
+            return
+
+        if not cv_text.strip():
+            print(f"ERROR: No text could be extracted from {os.path.basename(cv_file)}")
+            print("Please make sure the file contains extractable text.")
+            return
+
+    except Exception as e:
+        print(f"ERROR: Failed to read {cv_file}: {str(e)}")
         return
 
     detected_techs = extract_technical_terms(cv_text, keyword_extractor, top_n=5)
@@ -119,8 +269,17 @@ def main():
     asked_questions = set()
     all_answers = []
 
-    for i, q_type in enumerate(["technical", "soft_skills", "motivation"], 1):
+    # Generate 2 questions of each type
+    question_types = [
+        "technical",
+        "technical",
+        "soft_skills",
+        "soft_skills",
+        "motivation",
+        "motivation",
+    ]
 
+    for i, q_type in enumerate(question_types, 1):
         persona = "You are a sharp, creative, and insightful interviewer."
 
         if q_type == "technical":
@@ -210,7 +369,7 @@ Question:
             print("Used fallback question.")
 
         asked_questions.add(question)
-        print(f"\nQuestion {i}/3: {question}")
+        print(f"\nQuestion {i}/6: {question}")
 
         user_answer = input("\nYour answer (in English): ").strip()
 
@@ -267,27 +426,86 @@ Be concise (1-2 paragraphs).
         else:
             print("Needs more structure and specifics.")
 
-        if i < 3:
+        if i < 6:
             input("\nPress Enter for next question...")
 
     # Final Summary
-    print("\n" + "=" * 50)
+    print("\n" + "=" * 60)
     print("FINAL INTERVIEW REPORT")
-    print("=" * 50)
-    avg_score = (
-        (sum(a["score"] for a in all_answers) / len(all_answers))
-        if all_answers
-        else 0.0
+    print("=" * 60)
+
+    # Calculate scores by category
+    technical_scores = [a["score"] for i, a in enumerate(all_answers) if i < 2]
+    soft_scores = [a["score"] for i, a in enumerate(all_answers) if 2 <= i < 4]
+    motivation_scores = [a["score"] for i, a in enumerate(all_answers) if i >= 4]
+
+    avg_technical = (
+        sum(technical_scores) / len(technical_scores) if technical_scores else 0
     )
-    for i, a in enumerate(all_answers, 1):
-        print(f"Q{i} [{a['score']:.1%}]: {a['question'][:60]}...")
-    print(f"\nOverall Score: {avg_score:.2%}")
-    if avg_score > 0.75:
-        print("Strong candidate!")
-    elif avg_score > 0.5:
-        print("Good potential with practice.")
+    avg_soft = sum(soft_scores) / len(soft_scores) if soft_scores else 0
+    avg_motivation = (
+        sum(motivation_scores) / len(motivation_scores) if motivation_scores else 0
+    )
+    overall_avg = (avg_technical + avg_soft + avg_motivation) / 3
+
+    # Print questions by category
+    print("\nTechnical Questions:")
+    for i in range(2):
+        print(
+            f"  Q{i+1} [{all_answers[i]['score']:.1%}]: {all_answers[i]['question'][:60]}..."
+        )
+    print(f"  Average: {avg_technical:.1%}")
+
+    print("\nBehavioral Questions:")
+    for i in range(2, 4):
+        print(
+            f"  Q{i+1} [{all_answers[i]['score']:.1%}]: {all_answers[i]['question'][:60]}..."
+        )
+    print(f"  Average: {avg_soft:.1%}")
+
+    print("\nMotivation Questions:")
+    for i in range(4, 6):
+        print(
+            f"  Q{i+1} [{all_answers[i]['score']:.1%}]: {all_answers[i]['question'][:60]}..."
+        )
+    print(f"  Average: {avg_motivation:.1%}")
+
+    print("\n" + "-" * 60)
+    print(f"Overall Score: {overall_avg:.1%}")
+
+    # Overall assessment
+    strengths = []
+    areas_to_improve = []
+
+    if avg_technical > 0.7:
+        strengths.append("Technical knowledge")
+    elif avg_technical < 0.5:
+        areas_to_improve.append("Technical depth")
+
+    if avg_soft > 0.7:
+        strengths.append("Behavioral competencies")
+    elif avg_soft < 0.5:
+        areas_to_improve.append("STAR method responses")
+
+    if avg_motivation > 0.7:
+        strengths.append("Career clarity")
+    elif avg_motivation < 0.5:
+        areas_to_improve.append("Professional motivation")
+
+    if strengths:
+        print("\nStrengths:", ", ".join(strengths))
+    if areas_to_improve:
+        print("Areas to Improve:", ", ".join(areas_to_improve))
+
+    print("\nOverall Assessment:")
+    if overall_avg > 0.75:
+        print("Strong candidate! Ready for advanced interviews.")
+    elif overall_avg > 0.6:
+        print("Good potential with some preparation needed.")
+    elif overall_avg > 0.4:
+        print("More practice recommended, focus on identified areas.")
     else:
-        print("Recommend more preparation.")
+        print("Significant preparation needed before formal interviews.")
 
 
 if __name__ == "__main__":

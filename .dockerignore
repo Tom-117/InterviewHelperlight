@@ -1,8 +1,8 @@
 
 .git
 .gitignore
-
-
+.github/
+uploads/
 # Python
 __pycache__
 *.pyc
