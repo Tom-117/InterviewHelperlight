@@ -18,7 +18,7 @@ coverage.xml
 *.egg-info
 dist
 build
-
+*.log
 # Development
 .env
 .venv

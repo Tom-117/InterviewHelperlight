@@ -3,9 +3,14 @@ name: Build and Push Docker Image to Docker Hub
 on:
   push:
     branches:
+      - main
+      - master
       - features/webui
-  workflow_dispatch:
-
+  workflow_run:
+    workflows: ["Flask App and Model Tests"]
+    types:
+      - completed
+  
 jobs:
   
   build-and-push:
