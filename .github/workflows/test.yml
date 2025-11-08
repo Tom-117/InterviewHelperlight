@@ -10,10 +10,14 @@ on:
     branches:
       - main
       - master
+  workflow_run:
+    workflows: ["Lint Code"]
+    types:
+      - completed
   workflow_dispatch:
-
 jobs:
   test:
+    
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
