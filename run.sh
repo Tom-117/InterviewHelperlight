@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 set -e
 
 DOCKER_IMAGE="tom0117/interview-helper-lite:webui"
